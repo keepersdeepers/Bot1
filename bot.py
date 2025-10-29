@@ -13,7 +13,7 @@ from database import (
 
 bot = telebot.TeleBot(TOKEN)
 
-init_db()  # создаём базу при запуску
+init_db()  # создаём базу при запуске
 
 # Функция уведомления продавца
 def notify_seller(deal_id, message_text):
@@ -51,7 +51,7 @@ def my_deals(message):
     conn.close()
 
     if not deals:
-        bot.send_message(message.chat.id, "❌ У тебя пока нет активных сделок.", reply_markup=main_menu())
+        bot.send_message(message.chat.id, "❌ У тебя нет сделок.", reply_markup=main_menu())
         return
 
     text = "📦 Твои сделки:\n\n"
@@ -61,9 +61,9 @@ def my_deals(message):
             "waiting_buyer": "Ожидает покупателя",
             "waiting_payment": "Ожидает оплаты",
             "waiting_gift": "Ожидает подарок",
-            "completed": "✅ Завершена",
+            "completed": "✅ Успешно",
             "dispute": "⚠️ Открыт спор",
-            "cancelled": "❌ Отменена"
+            "cancelled": "❌ Закрыта"
         }.get(status, status)
         text += f"#{deal_id} — {gift_name} ({price}₽)\nСтатус: {status_text}\n\n"
 
@@ -79,7 +79,7 @@ def ask_gift_name(msg):
 
 def ask_price(msg):
     gift_name = msg.text
-    bot.send_message(msg.chat.id, "💰 Укажи цену (например, 500₽):")
+    bot.send_message(msg.chat.id, "💰 Укажи цену:")
     bot.register_next_step_handler(msg, lambda m: save_deal(m, gift_name))
 
 def save_deal(msg, gift_name):
@@ -95,7 +95,7 @@ def save_deal(msg, gift_name):
 def show_deals(msg):
     deals = get_deals_by_status("waiting_buyer")
     if not deals:
-        bot.send_message(msg.chat.id, "Пока нет активных предложений 😕")
+        bot.send_message(msg.chat.id, "Нет активных предложений 😕")
         return
     for deal in deals:
         deal_id, seller_id, gift_name, price = deal
@@ -147,7 +147,7 @@ def mark_paid(call):
     
     bot.send_message(call.message.chat.id, "✅ Оплата зафиксирована. Ожидаем подарок от продавца.",
                      reply_markup=confirm_receive_keyboard(deal_id))
-    bot.send_message(ADMIN_ID, f"⚠️ Сделка #{deal_id} оплачена. Проверь поступление средств.")
+    bot.send_message(ADMIN_ID, f"⚠️ Сделка #{deal_id} оплачена. ВНИМАНИЕ! ОБЯЗАТЕЛЬНО ПРОВЕРЯЙТЕ ПОСТУПЛЕНИЕ СРЕДСТВ ПЕРЕД ПЕРЕДАЧЕЙ!")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("received_"))
 def mark_received(call):
@@ -160,7 +160,7 @@ def mark_received(call):
         f"🎁 {get_deal_by_id(deal_id).gift_name}\n"
         f"💰 {get_deal_by_id(deal_id).price}\n"
         f"✅ Покупатель подтвердил получение подарка.\n\n"
-        f"Средства будут переведены на ваш счёт.")
+        f"Средства будут переведены на ваш счёт в течение 5-15 минут.")
     
     bot.send_message(call.message.chat.id, "🎉 Сделка завершена! Спасибо за использование гаранта 💎")
     bot.send_message(ADMIN_ID, f"✅ Сделка #{deal_id} успешно завершена.")
@@ -213,22 +213,22 @@ def open_dispute(call):
     if notify_user:
         try:
             bot.send_message(notify_user,
-                           f"⚠️ Открыт спор по сделке\n"
+                           f"⚠️ Внимание! Открыт спор по сделке.\n"
                            f"🎁 {deal.gift_name}\n"
                            f"👤 {role} открыл спор\n\n"
-                           f"Администратор свяжется для решения ситуации")
+                           f"В течение 2-3 минут администратор свяжется с обоими сторонами для решения ситуации.")
         except Exception as e:
             print(f"Не удалось уведомить пользователя {notify_user}: {e}")
     
     bot.send_message(ADMIN_ID, 
-                    f"🚨 Открыт спор по сделке #{deal_id}\n"
+                    f"🚨 Внимание! Открыт спор по сделке #{deal_id}\n"
                     f"🎁 {deal.gift_name}\n"
                     f"💰 {deal.price}\n"
                     f"👤 Продавец: {deal.seller_id}\n"
                     f"👤 Покупатель: {deal.buyer_id}\n"
                     f"🚩 Инициатор спора: {call.from_user.id}")
     
-    bot.send_message(call.message.chat.id, "⚠️ Спор открыт. Администратор свяжется с вами.")
+    bot.send_message(call.message.chat.id, "⚠️ Спор открыт. Администратор свяжется с вами в течение 3 минут.")
 
 if __name__ == "__main__":
     print("База данных готова ✅")
