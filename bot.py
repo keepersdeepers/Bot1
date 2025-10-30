@@ -15,6 +15,14 @@ from keyboards import (
 bot = telebot.TeleBot(TOKEN)
 
 init_db()
+migrate_old_deals()
+
+
+# проверяем наличие юзера
+def check_username(user):
+	if not user.username:
+		return False 
+		return True
 
 # Функция уведомления продавца
 def notify_seller(deal_id, message_text):
@@ -31,10 +39,23 @@ def notify_seller(deal_id, message_text):
 # -----------------------
 @bot.message_handler(commands=['start'])
 def start(msg):
+    user = msg.from_user
     get_or_create_user(msg.from_user.id, msg.from_user.username)
     bot.send_message(msg.chat.id, "👋 Привет! Я — Гарант Бот для Telegram Gifts. MakarGarant.\n\n"
                                   "Здесь можно безопасно продавать и покупать подарки 🎁", 
                                   reply_markup=main_menu())
+                                  
+if not check_username(user):
+        bot.send_message(msg.chat.id, 
+                        "❌ *Внимание!* Для использования бота необходимо:\n\n"
+                        "1. Установить *username* в настройках Telegram\n"
+                        "2. Нажать /start снова\n\n"
+                        "Как установить username:\n"
+                        "Настройки → Edit Profile → Username",
+                        parse_mode="Markdown")
+        return
+    
+    get_or_create_user(user.id, user.username)                             
 
 # -----------------------
 # Личный кабинет
@@ -387,6 +408,12 @@ def my_deals(message):
 
 @bot.message_handler(func=lambda m: m.text == "📦 Создать сделку")
 def ask_gift_name(msg):
+    if not check_username(msg.from_user):
+        bot.send_message(msg.chat.id, 
+                        "❌ Сначала установи *username* в настройках Telegram!\n\n"
+                        "Без username другие пользователи не смогут вас найти.",
+                        parse_mode="Markdown")
+        return
     bot.send_message(msg.chat.id, "🎁 Введи название подарка:")
     bot.register_next_step_handler(msg, ask_price)
 
@@ -397,11 +424,20 @@ def ask_price(msg):
 
 def save_deal(msg, gift_name):
     price = msg.text
-    create_deal(msg.chat.id, gift_name, price)
+    create_deal(msg.from.user.id, msg.from_user.username, gift_name, price)
     bot.send_message(msg.chat.id, f"✅ Сделка создана!\nПодарок: {gift_name}\nЦена: {price}\n\n"
                                   "Теперь покупатель может её найти и купить.")
 
 @bot.message_handler(func=lambda m: m.text == "🛒 Купить подарок")
+   if not check_username(call.from_user):
+        bot.answer_callback_query(call.id, 
+                                 "❌ Установи username в настройках Telegram!", 
+                                 show_alert=True)
+        return
+    
+    deal_id = int(call.data.split("_")[1])
+    deal = get_deal_by_id(deal_id)
+    update_deal_buyer(deal_id, call.from_user.id, call.from_user.username)
 def show_deals(msg):
     deals = get_deals_by_status("waiting_buyer")
     if not deals:
@@ -480,7 +516,7 @@ def cancel_deal(call):
         try:
             bot.send_message(notify_user, 
                            f"❌ Сделка отменена\n"
-                           f"🎁 {deal.gift_name}\n"
+                              f"🎁 {deal.gift_name}\n"
                            f"👤 {role} отменил сделку")
         except Exception as e:
             print(f"Не удалось уведомить пользователя {notify_user}: {e}")
@@ -519,7 +555,7 @@ def open_dispute(call):
                     f"👤 Покупатель: {deal.buyer_id}\n"
                     f"🚩 Инициатор спора: {call.from_user.id}")
     
-    bot.send_message(call.message.chat.id, "⚠️ Спор открыт. Администратор свяжется с вами.")
+                    bot.send_message(call.message.chat.id, "⚠️ Спор открыт. Администратор свяжется с вами.")
 
 if __name__ == "__main__":
     print("База данных готова ✅")
